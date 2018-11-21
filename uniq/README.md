@@ -9,13 +9,9 @@ Implemented uniq command in xv6- uniq is a Unix utility which, when fed a text f
 Examples:
 $ cat example.txt
 No. 1
-```
 No. 2
-
 No. 2
-
 No. 2
-
 No. 3
 No. 4
 No. 5
@@ -75,3 +71,4 @@ $ uniq -c -i example.txt
 1 No. 5
 2 No. 6
 2 No. 2
+```
