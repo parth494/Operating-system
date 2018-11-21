@@ -18,7 +18,7 @@ README.md
 
 3) Pipes - Ability to pipe the output of one command into the input of another.
 
-````
+```
 $ cat /usr/share/dict/words | grep cat | sed s/cat/dog/ > doggerel.txt
 ```
 
