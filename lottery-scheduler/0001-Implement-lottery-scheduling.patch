@@ -1,0 +1,200 @@
+From 99f11145507c1ed778caf3d83a966560aa5c9de5 Mon Sep 17 00:00:00 2001
+From: Parth Shah <pjs520@nyu.edu>
+Date: Tue, 20 Nov 2018 19:31:33 -0500
+Subject: [PATCH] Implement lottery scheduling
+
+---
+ Makefile  |  1 +
+ defs.h    |  1 +
+ proc.c    | 26 +++++++++++++++++++++++---
+ proc.h    |  1 +
+ syscall.c |  2 ++
+ syscall.h |  1 +
+ sysproc.c | 11 +++++++++++
+ user.h    |  1 +
+ usys.S    |  1 +
+ 9 files changed, 42 insertions(+), 3 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 5d91068..7d17a81 100644
+--- a/Makefile
++++ b/Makefile
+@@ -174,6 +174,7 @@ UPROGS=\
+ 	_wc\
+ 	_zombie\
+ 	_hackbench\
++	_lotterytest\
+ 
+ fs.img: mkfs README $(UPROGS)
+ 	./mkfs fs.img README $(UPROGS)
+diff --git a/defs.h b/defs.h
+index 90561dd..996e079 100644
+--- a/defs.h
++++ b/defs.h
+@@ -119,6 +119,7 @@ void            userinit(void);
+ int             wait(void);
+ void            wakeup(void*);
+ void            yield(void);
++void            settickets(int);
+ 
+ // swtch.S
+ void            swtch(struct context**, struct context*);
+diff --git a/proc.c b/proc.c
+index b122e3b..83a5dc5 100644
+--- a/proc.c
++++ b/proc.c
+@@ -14,7 +14,6 @@ struct {
+ } ptable;
+ 
+ static struct proc *initproc;
+-
+ int nextpid = 1;
+ extern void forkret(void);
+ extern void trapret(void);
+@@ -72,7 +71,7 @@ found:
+   p->context = (struct context*)sp;
+   memset(p->context, 0, sizeof *p->context);
+   p->context->eip = (uint)forkret;
+-
++  p->tickets = 20;
+   return p;
+ }
+ 
+@@ -257,6 +256,16 @@ wait(void)
+   }
+ }
+ 
++
++int getTotalTix(void){
++  struct proc *p;
++  int tot_tix=0;
++  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
++    if(p->state != RUNNABLE)
++      tot_tix+=p->tickets;
++  }
++  return tot_tix;
++}
+ //PAGEBREAK: 42
+ // Per-CPU process scheduler.
+ // Each CPU calls scheduler() after setting itself up.
+@@ -270,6 +279,9 @@ scheduler(void)
+ {
+   struct proc *p;
+   int foundproc = 1;
++  int counter=0, tot_tix=0;
++  long winner = 0;
++
+ 
+   for(;;){
+     // Enable interrupts on this processor.
+@@ -280,10 +292,17 @@ scheduler(void)
+ 
+     // Loop over process table looking for process to run.
+     acquire(&ptable.lock);
++    tot_tix = getTotalTix();
++    winner = random_at_most(tot_tix);
++    counter = 0;
++    
+     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+       if(p->state != RUNNABLE)
+         continue;
+-
++      if((counter + p->tickets)<winner){
++        counter+= p->tickets;
++        continue;
++      }
+       // Switch to chosen process.  It is the process's job
+       // to release ptable.lock and then reacquire it
+       // before jumping back to us.
+@@ -297,6 +316,7 @@ scheduler(void)
+       // Process is done running for now.
+       // It should have changed its p->state before coming back.
+       proc = 0;
++      break;
+     }
+     release(&ptable.lock);
+ 
+diff --git a/proc.h b/proc.h
+index 3b9c3ac..bbb6e88 100644
+--- a/proc.h
++++ b/proc.h
+@@ -66,6 +66,7 @@ struct proc {
+   struct file *ofile[NOFILE];  // Open files
+   struct inode *cwd;           // Current directory
+   char name[16];               // Process name (debugging)
++  int tickets;                 //Allocate 20 tickets
+ };
+ 
+ // Process memory is laid out contiguously, low addresses first:
+diff --git a/syscall.c b/syscall.c
+index 0e06ad4..384fc9d 100644
+--- a/syscall.c
++++ b/syscall.c
+@@ -99,6 +99,7 @@ extern int sys_wait(void);
+ extern int sys_write(void);
+ extern int sys_uptime(void);
+ extern int sys_gettime(void);
++extern int sys_settickets(void);
+ 
+ static int (*syscalls[])(void) = {
+ [SYS_fork]    sys_fork,
+@@ -123,6 +124,7 @@ static int (*syscalls[])(void) = {
+ [SYS_mkdir]   sys_mkdir,
+ [SYS_close]   sys_close,
+ [SYS_gettime] sys_gettime,
++[SYS_settickets] sys_settickets
+ };
+ 
+ void
+diff --git a/syscall.h b/syscall.h
+index 6d6c224..e59bc4a 100644
+--- a/syscall.h
++++ b/syscall.h
+@@ -21,3 +21,4 @@
+ #define SYS_mkdir  20
+ #define SYS_close  21
+ #define SYS_gettime 22
++#define SYS_settickets 23
+diff --git a/sysproc.c b/sysproc.c
+index ddaed7c..ed1d08c 100644
+--- a/sysproc.c
++++ b/sysproc.c
+@@ -98,3 +98,14 @@ sys_gettime(void) {
+   cmostime(d);
+   return 0;
+ }
++
++void
++sys_settickets(void)
++{
++  int tix;
++  if(argint(0, &tix) < 0){
++    proc->tickets = 20;
++    return;
++  }
++  proc->tickets = tix;
++}
+diff --git a/user.h b/user.h
+index 46d1059..b203890 100644
+--- a/user.h
++++ b/user.h
+@@ -24,6 +24,7 @@ char* sbrk(int);
+ int sleep(int);
+ int uptime(void);
+ int gettime(struct rtcdate *);
++void settickets(int);
+ 
+ // ulib.c
+ int stat(char*, struct stat*);
+diff --git a/usys.S b/usys.S
+index e556d66..27646a9 100644
+--- a/usys.S
++++ b/usys.S
+@@ -30,3 +30,4 @@ SYSCALL(sbrk)
+ SYSCALL(sleep)
+ SYSCALL(uptime)
+ SYSCALL(gettime)
++SYSCALL(settickets)
+-- 
+1.9.1
+
