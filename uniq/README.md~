@@ -7,11 +7,17 @@ Implemented uniq command in xv6- uniq is a Unix utility which, when fed a text f
 :  ignore differences in case when comparing
 
 Examples:
+
 $ cat example.txt
+
 No. 1
+
 No. 2
+
 No. 2
+
 No. 2
+
 No. 3
 No. 4
 No. 5

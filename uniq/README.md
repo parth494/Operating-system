@@ -11,7 +11,6 @@ Examples:
 $ cat example.txt
 
 No. 1
-
 No. 2
 
 No. 2
