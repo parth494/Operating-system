@@ -1,9 +1,15 @@
 Implemented uniq command in xv6- uniq is a Unix utility which, when fed a text file, outputs the file with adjacent identical lines collapsed to one.  If a filename is provided on the command line (i.e.,uniq FILE) then uniq should open it, read, filter out, print without repeated lines in this file, and then close it.  If no filename is provided, uniq should read from standard input. The traditional UNIX uniq utility can do lots of things, such as:
+
 -c
+
 :  count and group prefix lines by the number of occurrences
+
 -d
+
 :  only print duplicate lines
+
 -i
+
 :  ignore differences in case when comparing
 ```
 Examples:
