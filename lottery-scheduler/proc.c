@@ -261,7 +261,7 @@ int getTotalTix(void){
   struct proc *p;
   int tot_tix=0;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->state != RUNNABLE)
+    if(p->state == RUNNABLE)
       tot_tix+=p->tickets;
   }
   return tot_tix;
